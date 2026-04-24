@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>KIA // OPERATIVE TERMINAL</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&display=swap');
+
+:root {
+  --g: #00ff9d;
+  --g2: rgba(0,255,157,0.12);
+  --g3: rgba(0,255,157,0.05);
+  --amb: #ffb347;
+  --red: #ff4444;
+  --bg: #030f09;
+  --border: rgba(0,255,157,0.2);
+  --glow: 0 0 8px rgba(0,255,157,0.5);
+  --mono: 'Share Tech Mono', monospace;
+  --head: 'Orbitron', monospace;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+
+body {
+  background: var(--bg);
+  color: var(--g);
+  font-family: var(--mono);
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+body::before {
+  content:''; position:fixed; inset:0;
+  background: repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,255,157,0.015) 3px,rgba(0,255,157,0.018) 4px);
+  pointer-events:none; z-index:500;
+}
+
+/* ── LOGIN SCREEN ── */
+#loginScreen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 24px;
+  gap: 20px;
+}
+
+.login-logo {
+  font-family: var(--head);
+  font-size: clamp(22px, 6vw, 32px);
+  letter-spacing: 8px;
+  text-shadow: var(--glow);
+  text-align: center;
+  animation: flicker 7s steps(1) infinite;
+}
+.login-logo em { color: var(--amb); font-style:normal; }
+@keyframes flicker{0%,94%,96%,100%{opacity:1}95%{opacity:0.4}}
+
+.login-sub {
+  font-size: 9px; letter-spacing: 3px; opacity: 0.4; text-align: center; line-height: 2;
+}
+
+.login-box {
+  width: 100%; max-width: 360px;
+  border: 1px solid var(--border);
+  background: var(--g3);
+  padding: 24px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+.login-label { font-size: 8px; letter-spacing: 3px; opacity: 0.5; }
+
+.player-list {
+  display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto;
+}
+.player-list::-webkit-scrollbar { width: 3px; }
+.player-list::-webkit-scrollbar-thumb { background: rgba(0,255,157,0.2); }
+
+.player-opt {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(0,255,157,0.15);
+  background: rgba(0,0,0,0.3);
+  cursor: pointer; transition: all 0.2s;
+  font-size: 13px; letter-spacing: 2px;
+}
+.player-opt:hover, .player-opt:active { background: var(--g2); border-color: var(--g); box-shadow: var(--glow); }
+.player-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+.login-loading { font-size: 10px; opacity: 0.4; letter-spacing: 2px; text-align: center; padding: 16px; }
+
+/* ── MAIN TERMINAL ── */
+#terminal {
+  display: none;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* Header */
+.term-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 10px;
+}
+.term-logo { font-family: var(--head); font-size: 14px; letter-spacing: 4px; text-shadow: var(--glow); white-space: nowrap; }
+.term-logo em { color: var(--amb); font-style:normal; }
+.term-player {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 10px; letter-spacing: 2px;
+}
+.term-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.conn-badge {
+  font-size: 8px; letter-spacing: 2px; opacity: 0.5;
+  display: flex; align-items: center; gap: 5px;
+}
+.live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--red); transition: all 0.4s;
+}
+.live-dot.on { background: var(--g); box-shadow: var(--glow); animation: pulse 1.8s ease-in-out infinite; }
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.25}}
+
+/* Feed */
+.term-feed {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  -webkit-overflow-scrolling: touch;
+}
+.term-feed::-webkit-scrollbar { width: 3px; }
+.term-feed::-webkit-scrollbar-thumb { background: rgba(0,255,157,0.2); }
+
+/* Empty state */
+.feed-empty {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 10px; opacity: 0.25; text-align: center; padding: 40px;
+}
+.feed-empty .big { font-family: var(--head); font-size: 28px; letter-spacing: 4px; }
+.feed-empty .small { font-size: 9px; letter-spacing: 3px; line-height: 2; }
+
+/* Messages */
+.msg-wrap { display: flex; flex-direction: column; gap: 4px; animation: msgIn 0.3s ease; }
+@keyframes msgIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+.msg-meta { font-size: 8px; letter-spacing: 2px; opacity: 0.45; padding: 0 2px; }
+
+/* AD / GM message */
+.msg-ad {
+  border: 1px solid var(--amb);
+  background: rgba(255,179,71,0.06);
+  padding: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.msg-ad::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--amb), transparent);
+  animation: shimmer 2s linear infinite;
+}
+@keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+
+.ad-header {
+  font-size: 8px; letter-spacing: 3px; color: var(--amb);
+  opacity: 0.6; margin-bottom: 8px;
+  display: flex; justify-content: space-between;
+}
+.ad-body {
+  font-size: 13px; line-height: 1.8; color: var(--amb);
+  text-transform: uppercase; letter-spacing: 1px;
+  text-shadow: 0 0 8px rgba(255,179,71,0.3);
+}
+.ad-body.typing::after { content:'█'; animation: blink 0.6s step-end infinite; }
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* URGENT message */
+.msg-urgent {
+  border: 1px solid var(--red);
+  background: rgba(255,68,68,0.06);
+  padding: 14px;
+  position: relative;
+  overflow: hidden;
+  animation: urgentPulse 1.5s ease-in-out 3;
+}
+@keyframes urgentPulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 20px rgba(255,68,68,0.4)}}
+.msg-urgent .ad-header { color: var(--red); }
+.msg-urgent .ad-body { color: var(--red); text-shadow: 0 0 8px rgba(255,68,68,0.3); }
+.msg-urgent::before {
+  content:'';
+  position:absolute; top:0; left:0; right:0; height:2px;
+  background: linear-gradient(90deg,transparent,var(--red),transparent);
+  animation: shimmer 1s linear infinite;
+}
+
+/* Player reply */
+.msg-reply {
+  border: 1px solid rgba(0,255,157,0.25);
+  background: rgba(0,255,157,0.04);
+  padding: 12px 14px;
+  align-self: flex-end;
+  max-width: 85%;
+}
+.reply-body { font-size: 12px; line-height: 1.75; color: var(--g); text-transform: uppercase; letter-spacing: 1px; }
+
+/* Sys line */
+.sys-line { font-size: 9px; opacity: 0.28; letter-spacing: 2px; text-align: center; padding: 2px 0; }
+
+/* Input */
+.term-input {
+  border-top: 1px solid var(--border);
+  padding: 10px 14px;
+  display: flex; gap: 8px; align-items: flex-end;
+  background: rgba(0,255,157,0.02);
+  flex-shrink: 0;
+}
+.psym { color: var(--g); opacity: 0.5; font-size: 14px; padding-bottom: 10px; }
+.reply-field {
+  flex: 1; background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(0,255,157,0.2);
+  color: var(--g); font-family: var(--mono); font-size: 12px;
+  padding: 10px 12px; outline: none; resize: none; height: 48px;
+  line-height: 1.5; caret-color: var(--g);
+  text-transform: uppercase;
+  transition: border-color 0.2s;
+  -webkit-appearance: none;
+}
+.reply-field:focus { border-color: var(--g); box-shadow: var(--glow); }
+.reply-field::placeholder { color: rgba(0,255,157,0.2); text-transform: uppercase; }
+.reply-btn {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--g); font-family: var(--mono); font-size: 8px;
+  letter-spacing: 2px; padding: 0 12px; height: 48px;
+  cursor: pointer; transition: all 0.2s; white-space: nowrap;
+}
+.reply-btn:hover, .reply-btn:active { background: var(--g2); border-color: var(--g); box-shadow: var(--glow); }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(10px);
+  background: rgba(3,15,9,0.96); border: 1px solid var(--g);
+  color: var(--g); font-family: var(--mono); font-size: 10px;
+  letter-spacing: 2px; padding: 10px 18px; white-space: nowrap;
+  box-shadow: var(--glow); z-index: 999; opacity: 0;
+  transition: all 0.3s; pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-logo">K<em>IA</em></div>
+  <div class="login-sub">OPERATIVE TERMINAL // SECTOR 7<br>TYRELL–NEXUS NETWORK</div>
+  <div class="login-box">
+    <div class="login-label">SELECT YOUR OPERATIVE</div>
+    <div class="player-list" id="playerList">
+      <div class="login-loading">LOADING OPERATIVES...</div>
+    </div>
+  </div>
+</div>
+
+<!-- TERMINAL -->
+<div id="terminal">
+  <div class="term-header">
+    <div class="term-logo">K<em>IA</em></div>
+    <div class="term-player">
+      <div class="term-dot" id="termDot"></div>
+      <span id="termName">--</span>
+    </div>
+    <div class="conn-badge">
+      <div class="live-dot" id="liveDot"></div>
+      <span id="liveLabel">--</span>
+    </div>
+  </div>
+
+  <div class="term-feed" id="termFeed">
+    <div class="feed-empty" id="feedEmpty">
+      <div class="big">KIA</div>
+      <div class="small">AWAITING TRANSMISSION<br>FROM COMMAND</div>
+    </div>
+  </div>
+
+  <div class="term-input">
+    <div class="psym">&gt;_</div>
+    <textarea class="reply-field" id="replyField" placeholder="REPLY TO COMMAND..." maxlength="300"></textarea>
+    <button class="reply-btn" onclick="sendReply()">SEND</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://lfatmuutkrpjwzhwetsq.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_KIfW7edYUDrvIWOr5nJn3Q_GdofYJYk';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentPlayer = null;
+let renderedIds = new Set();
+
+// ── TOAST ──
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── CONN STATUS ──
+function setConn(live) {
+  document.getElementById('liveDot').className = 'live-dot' + (live?' on':'');
+  document.getElementById('liveLabel').textContent = live ? 'LIVE' : 'OFFLINE';
+}
+
+// ── LOAD PLAYERS ──
+async function loadPlayers() {
+  try {
+    const { data, error } = await db.from('availability').select('*').eq('date','');
+    if (error) throw error;
+    const list = document.getElementById('playerList');
+    if (!data.length) {
+      list.innerHTML = '<div class="login-loading">NO OPERATIVES REGISTERED</div>'; return;
+    }
+    list.innerHTML = data.map(p => `
+      <div class="player-opt" onclick="selectPlayer('${p.player_id}','${p.player_name}','${p.player_color}')">
+        <div class="player-dot" style="background:${p.player_color};box-shadow:0 0 6px ${p.player_color}"></div>
+        <span>${p.player_name}</span>
+      </div>`).join('');
+  } catch(e) {
+    document.getElementById('playerList').innerHTML = '<div class="login-loading">CONNECTION ERROR</div>';
+  }
+}
+
+// ── SELECT PLAYER & ENTER TERMINAL ──
+async function selectPlayer(id, name, color) {
+  currentPlayer = { id, name, color };
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('terminal').style.display = 'flex';
+  document.getElementById('termName').textContent = name;
+  document.getElementById('termDot').style.background = color;
+  document.getElementById('termDot').style.boxShadow = '0 0 6px ' + color;
+  await loadMessages();
+  subscribe();
+}
+
+// ── LOAD MESSAGES ──
+async function loadMessages() {
+  try {
+    const { data, error } = await db
+      .from('messages')
+      .select('*')
+      .or(`to_player.eq.${currentPlayer.id},and(from_name.eq.${currentPlayer.name},to_player.eq.GM)`)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    setConn(true);
+    for (const msg of data) {
+      if (!renderedIds.has(msg.id)) renderMessage(msg);
+    }
+    scrollFeed();
+  } catch(e) {
+    setConn(false);
+  }
+}
+
+// ── RENDER ONE MESSAGE ──
+function renderMessage(msg) {
+  renderedIds.add(msg.id);
+  const feed = document.getElementById('termFeed');
+  document.getElementById('feedEmpty')?.remove();
+
+  const wrap = document.createElement('div');
+  wrap.className = 'msg-wrap';
+  wrap.dataset.id = msg.id;
+
+  const time = new Date(msg.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+
+  if (msg.to_player === currentPlayer.id) {
+    // Incoming from GM
+    const isUrgent = msg.priority === 'URGENT';
+    const cls = isUrgent ? 'msg-urgent' : 'msg-ad';
+    const priLabel = isUrgent ? '⚠ URGENT TRANSMISSION ⚠' : msg.priority === 'HIGH' ? '! HIGH PRIORITY MESSAGE !' : 'INCOMING TRANSMISSION';
+    wrap.innerHTML = `
+      <div class="msg-meta">COMMAND // ${time}</div>
+      <div class="${cls}">
+        <div class="ad-header">
+          <span>${priLabel}</span>
+          <span>KIA-RELAY</span>
+        </div>
+        <div class="ad-body typing" id="body-${msg.id}"></div>
+      </div>`;
+    feed.appendChild(wrap);
+    typeText(document.getElementById('body-' + msg.id), msg.body, 18);
+  } else {
+    // Own reply
+    wrap.innerHTML = `
+      <div class="msg-meta" style="text-align:right;color:${currentPlayer.color}">${currentPlayer.name} // ${time}</div>
+      <div class="msg-reply">
+        <div class="reply-body">${escHtml(msg.body)}</div>
+      </div>`;
+    feed.appendChild(wrap);
+  }
+}
+
+// ── SEND REPLY ──
+async function sendReply() {
+  const field = document.getElementById('replyField');
+  const text = field.value.trim();
+  if (!text || !currentPlayer) return;
+
+  try {
+    const { error } = await db.from('messages').insert({
+      to_player: 'GM',
+      from_name: currentPlayer.name,
+      body: text.toUpperCase(),
+      priority: 'STANDARD'
+    });
+    if (error) throw error;
+    field.value = '';
+    toast('TRANSMISSION SENT');
+  } catch(e) {
+    toast('SEND ERROR');
+  }
+}
+
+// ── REAL-TIME ──
+function subscribe() {
+  db.channel('player-messages-' + currentPlayer.id)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+      const msg = payload.new;
+      if (renderedIds.has(msg.id)) return;
+      if (msg.to_player === currentPlayer.id ||
+         (msg.from_name === currentPlayer.name && msg.to_player === 'GM')) {
+        renderMessage(msg);
+        scrollFeed();
+        if (msg.to_player === currentPlayer.id) {
+          toast('NEW TRANSMISSION RECEIVED');
+        }
+      }
+    })
+    .subscribe(status => setConn(status === 'SUBSCRIBED'));
+}
+
+// ── HELPERS ──
+function typeText(el, text, speed) {
+  let i = 0;
+  const iv = setInterval(() => {
+    el.textContent += text[i++];
+    if (i >= text.length) { clearInterval(iv); el.classList.remove('typing'); }
+  }, speed);
+}
+
+function scrollFeed() {
+  const feed = document.getElementById('termFeed');
+  setTimeout(() => feed.scrollTop = feed.scrollHeight, 50);
+}
+
+function escHtml(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+document.getElementById('replyField').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(); }
+});
+
+// ── INIT ──
+loadPlayers();
+</script>
+</body>
+</html>
